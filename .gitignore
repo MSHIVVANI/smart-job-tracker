@@ -1,0 +1,23 @@
+# Dependencies
+/backend/node_modules
+/frontend/node_modules
+node_modules
+
+# Environment variables
+.env
+/backend/.env
+/frontend/.env
+
+# Build output
+/frontend/dist
+
+# Logs & temp files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.csv
+debug_*.png
+error_*.html
+
+# OS generated files
+.DS_Store

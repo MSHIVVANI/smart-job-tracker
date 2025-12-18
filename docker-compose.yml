@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: smart-job-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: # <-- ADD THIS
+      - app-network
+
+networks: # <-- ADD THIS WHOLE SECTION
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
