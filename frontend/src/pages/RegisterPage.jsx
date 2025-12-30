@@ -30,6 +30,12 @@ function RegisterPage() {
   return (
     <Container component="main" maxWidth="xs">
       <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box
+          component="img"
+          src="/logo.svg"
+          alt="Logo"
+          sx={{ height: 40, mb: 2 }} // mb is margin-bottom
+        />
         <Typography component="h1" variant="h5">Create an Account</Typography>
         {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
