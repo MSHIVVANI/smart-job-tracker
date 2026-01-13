@@ -61,3 +61,36 @@ export const suggestBulletPoints = async (req, res) => {
     res.status(500).json({ message: 'Failed to get AI suggestions from Groq.' });
   }
 };
+export const classifyEmail = async (req, res) => {
+  const { subject, body } = req.body;
+  if (!body) {
+    return res.status(400).json({ message: 'Email body is required.' });
+  }
+
+  const prompt = `
+    Analyze the following email and classify its intent.
+    The possible classifications are: REJECTION, INTERVIEW, NEXT_STEPS, UNKNOWN.
+    You must respond with only a single word from this list and nothing else.
+
+    Email to analyze:
+    """
+    Subject: ${subject}
+    Body: ${body}
+    """
+
+    Classification:
+  ` ;
+
+  try {
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'allam-2-7b', // A smaller, faster model is perfect for classification
+      temperature: 0.1, // Low temperature for consistent, non-creative answers
+    });
+    const classification = chatCompletion.choices[0]?.message?.content.trim().toUpperCase() || 'UNKNOWN';
+    res.status(200).json({ classification });
+  } catch (error) {
+    console.error('Groq email classification error:', error);
+    res.status(500).json({ message: 'Failed to classify email.' });
+  }
+};

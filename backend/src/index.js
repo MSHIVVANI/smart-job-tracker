@@ -2,11 +2,13 @@
 
 import express from 'express';
 import cors from 'cors';
+import cron from 'node-cron';
 import authRoutes from './routes/authRoutes.js';
 import applicationRoutes from './routes/applicationRoutes.js';
 import scraperRoutes from './routes/scraperRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
-import profileRoutes from './routes/profileRoutes.js'; 
+import profileRoutes from './routes/profileRoutes.js';
+import { scanAllUserInboxes } from './services/emailScanner.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,4 +36,11 @@ app.use('/api/profile', profileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+   console.log('🗓️  Scheduling hourly email scan job...');
+  cron.schedule('0 * * * *', () => {
+    console.log('🚀 Running initial email scan on startup for testing...');
+    scanAllUserInboxes();
+  });
+  console.log('!!! --- Manually triggering email scan for debugging --- !!!');
+  scanAllUserInboxes();
 });
