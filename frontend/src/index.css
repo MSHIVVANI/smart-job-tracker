@@ -6,3 +6,42 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background-color: #f4f6f8;
 }
+/* --- Add these styles to the end of frontend/src/index.css --- */
+
+/* 5️⃣ Highlight Today’s Date (Minimal & Professional) */
+.fc-day-today {
+  background-color: #69a9e9 !important; /* Soft, neutral blue/grey */
+  border: none !important;
+}
+
+/* ✨ Enhancement 2: Density Control - Style for colored dots in Year View */
+.fc-multimonth-day-events {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-top: 2px;
+}
+.event-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* ✨ Enhancement 3: Visual Priority - Muted style for Rejected events */
+.event-rejected {
+  opacity: 0.6;
+}
+
+/* General professional styling */
+.fc .fc-toolbar-title {
+  font-size: 1.2rem !important; /* Compact header font */
+  font-weight: 500 !important;
+}
+.fc .fc-button {
+  text-transform: none !important; /* No ALL CAPS on buttons */
+}
+.fc-event-main {
+  cursor: pointer;
+}
