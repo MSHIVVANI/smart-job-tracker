@@ -7,143 +7,89 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export const scanAllUserInboxes = async () => {
-  console.log('--- [EMAIL SCANNER]: Starting periodic email scan job ---');
+  console.log('--- [SCANNER]: Starting periodic scan job ---');
   
   const credentials = await prisma.serviceCredential.findMany({
-    where: { service: 'gmail' },
+    where: { service: 'gmail', status: 'active' },
     include: { user: { include: { applications: true } } },
   });
 
-  if (credentials.length === 0) {
-    console.log('--- [EMAIL SCANNER]: No users with connected Gmail accounts. Job finished. ---');
-    return;
-  }
+  if (credentials.length === 0) { console.log('--- [SCANNER]: No active users to scan. Job finished. ---'); return; }
   
   for (const cred of credentials) {
-    if (cred.user.applications.length === 0) {
-      console.log(`--- [EMAIL SCANNER]: User ${cred.user.email} has no applications to track. Skipping. ---`);
-      continue;
-    }
-    console.log(`--- [EMAIL SCANNER]: Scanning inbox for user: ${cred.user.email} ---`);
+    if (cred.user.applications.length === 0) { console.log(`--- [SCANNER]: User ${cred.user.email} has no applications. Skipping. ---`); continue; }
     
     try {
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
-      oauth2Client.setCredentials({
-        access_token: cred.accessToken,
-        refresh_token: cred.refreshToken,
-        expiry_date: Number(cred.expiryDate),
-      });
-
-      oauth2Client.on('tokens', async (tokens) => {
-        console.log(`--- [EMAIL SCANNER]: Refreshing token for ${cred.user.email} ---`);
-        await prisma.serviceCredential.update({
-          where: { id: cred.id },
-          data: { 
-            accessToken: tokens.access_token,
-            expiryDate: tokens.expiry_date,
-            refreshToken: tokens.refresh_token || cred.refreshToken,
-          },
-        });
-      });
+      const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+      oauth2Client.setCredentials({ access_token: cred.accessToken, refresh_token: cred.refreshToken, expiry_date: Number(cred.expiryDate) });
+      oauth2Client.on('tokens', async (tokens) => { await prisma.serviceCredential.update({ where: { id: cred.id }, data: { accessToken: tokens.access_token, expiryDate: tokens.expiry_date, refreshToken: tokens.refresh_token || cred.refreshToken } }); });
 
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-      const res = await gmail.users.messages.list({
-        userId: 'me',
-        q: 'is:unread',
-      });
+      const res = await gmail.users.messages.list({ userId: 'me', q: 'is:unread' });
       const messages = res.data.messages;
 
-      if (!messages || messages.length === 0) {
-        console.log(`--- [EMAIL SCANNER]: No unread emails found for ${cred.user.email}.`);
-        continue;
-      }
+      if (!messages || messages.length === 0) { console.log(`--- [SCANNER]: No unread emails for ${cred.user.email}.`); continue; }
 
-      console.log(`--- [EMAIL SCANNER]: Found ${messages.length} unread email(s). Filtering...`);
-      let foundMatch = false;
-
+      console.log(`--- [SCANNER]: Found ${messages.length} unread email(s) for ${cred.user.email}. Starting AI relevance check...`);
+      
       for (const message of messages) {
-        const email = await gmail.users.messages.get({ 
-          userId: 'me', 
-          id: message.id, 
-          format: 'full' // Get full email data to decode body
-        });
-        const subjectHeader = email.data.payload.headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+        const emailMetadata = await gmail.users.messages.get({ userId: 'me', id: message.id, format: 'metadata', metadataHeaders: ['Subject'] });
+        const subject = emailMetadata.data.payload.headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+        const snippet = emailMetadata.data.snippet || '';
+
+        const internalToken = jwt.sign({ id: cred.userId }, JWT_SECRET);
+        const relevanceResponse = await axios.post(
+          `${process.env.BACKEND_URL}/api/ai/find-relevant-app`,
+          { subject, snippet, applications: cred.user.applications },
+          { headers: { Authorization: `Bearer ${internalToken}` } }
+        );
         
-        // --- NEW DEBUGGING LOGS ---
-        console.log(`\n--- [DEBUG] Checking Email ---`);
-        console.log(`  Subject: "${subjectHeader}"`);
+        const matchedAppId = relevanceResponse.data.decision;
+        console.log(`--- [RELEVANCE]: Subject "${subject}" -> Matched App ID: ${matchedAppId}`);
 
-        const matchedApp = cred.user.applications.find(app => {
-          const companyName = app.company.toLowerCase().trim();
-          const subjectLower = subjectHeader.toLowerCase().trim();
-          
-          console.log(`    -> Comparing subject with Company: "${companyName}"`);
-          const isMatch = subjectLower.includes(companyName);
-          if (isMatch) {
-            console.log(`    ✅ MATCH FOUND!`);
-          }
-          
-          return isMatch;
-        });
-        // -------------------------
+        if (matchedAppId !== 'NONE') {
+          const matchedApp = cred.user.applications.find(app => app.id === matchedAppId);
+          if (!matchedApp) continue;
 
-        if (matchedApp) {
-          foundMatch = true;
-          console.log(`--- [EMAIL SCANNER]: Found a matching email for application at "${matchedApp.company}" based on subject.`);
+          console.log(`--- [RELEVANCE]: SUCCESS. Proceeding to full classification for "${matchedApp.company}".`);
           
+          const emailFull = await gmail.users.messages.get({ userId: 'me', id: message.id, format: 'full' });
           let body = '';
-          if (email.data.payload.parts) {
-            const part = email.data.payload.parts.find(p => p.mimeType === 'text/plain');
-            if (part && part.body.data) {
-              body = Buffer.from(part.body.data, 'base64').toString('utf-8');
-            }
-          } else if (email.data.payload.body.data) {
-            body = Buffer.from(email.data.payload.body.data, 'base64').toString('utf-8');
+          if (emailFull.data.payload.parts) {
+            const part = emailFull.data.payload.parts.find(p => p.mimeType === 'text/plain');
+            if (part?.body.data) body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+          } else if (emailFull.data.payload.body.data) {
+            body = Buffer.from(emailFull.data.payload.body.data, 'base64').toString('utf-8');
           }
           if (!body) continue;
 
-          if (!JWT_SECRET) throw new Error("JWT_SECRET is not defined!");
-          const internalToken = jwt.sign({ id: cred.userId }, JWT_SECRET);
-          
-          const classificationResponse = await axios.post(
-            `${process.env.BACKEND_URL}/api/ai/classify-email`,
-            { subject: subjectHeader, body },
-            { headers: { Authorization: `Bearer ${internalToken}` } }
-          );
+          const classificationResponse = await axios.post(`${process.env.BACKEND_URL}/api/ai/classify-email`, { subject, body }, { headers: { Authorization: `Bearer ${internalToken}` } });
           const { classification } = classificationResponse.data;
-          console.log(`--- [EMAIL SCANNER]: Email classified as: ${classification}`);
+          console.log(`--- [CLASSIFICATION]: Email classified as: ${classification}`);
 
           let newStatus = null;
           if (classification === 'INTERVIEW') newStatus = 'Interviewing';
           else if (classification === 'REJECTION') newStatus = 'Rejected';
+          else if (classification === 'OFFER') newStatus = 'Offer';
           else if (classification === 'NEXT_STEPS') newStatus = 'Interviewing';
+          
           if (newStatus && matchedApp.status !== newStatus) {
-            await prisma.application.update({ where: { id: matchedApp.id }, data: { status: newStatus } });
-            console.log(`--- [EMAIL SCANNER]: SUCCESS! Updated application "${matchedApp.roleTitle}" to status: ${newStatus}`);
+            const updatedApp = await prisma.application.update({ where: { id: matchedApp.id }, data: { status: newStatus, updatedAt: new Date() } });
+            console.log(`--- [SUCCESS]: Updated application "${updatedApp.roleTitle}" to status: ${newStatus}`);
+            global.io.emit('application-updated', { userId: cred.userId, updatedApp });
           }
 
-          await gmail.users.messages.modify({
-            userId: 'me',
-            id: message.id,
-            requestBody: { removeLabelIds: ['UNREAD'] },
-          });
-          
-          // Stop after finding and processing one match for this test run to keep logs clean
-          break; 
+          await gmail.users.messages.modify({ userId: 'me', id: message.id, requestBody: { removeLabelIds: ['UNREAD'] } });
         }
       }
-
-      if (!foundMatch) {
-        console.log('--- [EMAIL SCANNER]: Finished filtering. No emails matched the subject criteria.');
-      }
-
     } catch (error) {
-      console.error(`--- [EMAIL SCANNER]: ERROR!`, error);
+      if (error.response?.data?.error === 'invalid_grant' || error.message?.includes('invalid_grant')) {
+        console.error(`--- [SCANNER]: ERROR! Token for ${cred.user.email} is invalid. Marking as revoked.`);
+        await prisma.serviceCredential.update({ where: { id: cred.id }, data: { status: 'revoked' } });
+      } else {
+        console.error(`--- [SCANNER]: ERROR! A non-auth error occurred for ${cred.user.email}:`, error);
+      }
     }
   }
-  console.log('--- [EMAIL SCANNER]: Finished periodic email scan job ---');
+  console.log('--- [SCANNER]: Finished periodic scan job ---');
 };

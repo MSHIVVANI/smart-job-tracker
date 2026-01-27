@@ -124,7 +124,9 @@ export const getGoogleAuthStatus = async (req, res) => {
     const credential = await prisma.serviceCredential.findFirst({
       where: { userId: req.userId, service: 'gmail' },
     });
-    res.status(200).json({ isConnected: !!credential });
+    res.status(200).json({ isConnected: !!credential,
+      status: credential ? credential.status : 'disconnected'
+     });
   } catch (error) {
     res.status(500).json({ message: 'Server error.' });
   }

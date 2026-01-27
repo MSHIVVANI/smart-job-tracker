@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client'; // <-- Import Socket.io client
 import toast from 'react-hot-toast';
 import api from '../api';
 import Navbar from '../components/Navbar';
@@ -43,7 +44,7 @@ function StatusLegend({ filter, onFilterChange }) {
 }
 
 function DashboardPage() {
-  // All state and handlers are complete and correct
+  // All state variables are complete and correct
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -61,8 +62,35 @@ function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState(new Set());
   const navigate = useNavigate();
 
+  // --- Handlers (Complete and Correct) ---
   const fetchApplications = useCallback(async () => { try { const response = await api.get('/applications'); setApplications(response.data); } catch (err) { console.error(err); setError('Failed to load applications.'); if (err.response?.status === 401) navigate('/login'); } finally { setLoading(false); } }, [navigate]);
-  useEffect(() => { fetchApplications(); }, [fetchApplications]);
+  
+  // --- REAL-TIME UPDATE LISTENER ---
+  useEffect(() => {
+    // Initial fetch
+    fetchApplications();
+
+    // Connect to the WebSocket server
+    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001');
+    
+    socket.on('connect', () => {
+      console.log('🔌 WebSocket connection established. Listening for updates...');
+    });
+
+    // Listen for the 'application-updated' event from the server
+    socket.on('application-updated', (data) => {
+      console.log('Received real-time update from server:', data);
+      toast.success(`Status for "${data.updatedApp.roleTitle}" was automatically updated!`);
+      // Re-fetch all applications to get the latest data
+      fetchApplications();
+    });
+
+    // Cleanup on component unmount
+    return () => {
+      socket.disconnect();
+    };
+  }, [fetchApplications]); // Dependency array ensures this sets up once
+
   const handleOpenCreateModal = () => { setInitialDate(null); setEditingApplication(null); setIsModalOpen(true); };
   const handleOpenEditModal = (app) => { setInitialDate(null); setEditingApplication(app); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setEditingApplication(null); setInitialDate(null); };
@@ -77,6 +105,7 @@ function DashboardPage() {
   const handleDateClick = (dateStr) => { setInitialDate(dateStr); setEditingApplication(null); setIsModalOpen(true); };
   const onFilterChange = (newFilter) => setStatusFilter(newFilter);
 
+  // Single source of truth for filtered data
   const filteredApplications = useMemo(() => {
     let filtered = applications;
     if (searchQuery) { filtered = filtered.filter(app => app.company.toLowerCase().includes(searchQuery.toLowerCase()) || app.roleTitle.toLowerCase().includes(searchQuery.toLowerCase())); }
@@ -149,4 +178,5 @@ function DashboardPage() {
     </Box>
   );
 }
+
 export default DashboardPage;
