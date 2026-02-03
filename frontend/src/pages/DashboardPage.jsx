@@ -8,6 +8,7 @@ import ScrapedJobCard from '../components/ScrapedJobCard';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import ApplicationsDataGrid from '../components/ApplicationsDataGrid';
 import ApplicationsCalendar from '../components/ApplicationsCalendar';
+import AnalyticsDashboard from '../components/AnalyticsDashboard';
 
 import {
   Container,
@@ -30,6 +31,7 @@ import {
 
 import ViewListIcon from '@mui/icons-material/ViewList';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import BarChartIcon from '@mui/icons-material/BarChart';
 
 /* ---------- Status Legend ---------- */
 
@@ -46,9 +48,7 @@ const statusColors = {
 function StatusLegend({ filter, onFilterChange }) {
   const toggleFilter = (status) => {
     const newFilter = new Set(filter);
-    newFilter.has(status)
-      ? newFilter.delete(status)
-      : newFilter.add(status);
+    newFilter.has(status) ? newFilter.delete(status) : newFilter.add(status);
     onFilterChange(newFilter);
   };
 
@@ -62,7 +62,7 @@ function StatusLegend({ filter, onFilterChange }) {
           sx={{
             backgroundColor: filter.has(status) ? color : '#e0e0e0',
             color: filter.has(status) ? 'white' : 'inherit',
-            '&:hover': { cursor: 'pointer' },
+            cursor: 'pointer'
           }}
         />
       ))}
@@ -73,11 +73,15 @@ function StatusLegend({ filter, onFilterChange }) {
 /* ---------- Dashboard Page ---------- */
 
 function DashboardPage() {
+  const navigate = useNavigate();
+
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApplication, setEditingApplication] = useState(null);
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [applicationToDelete, setApplicationToDelete] = useState(null);
 
@@ -93,25 +97,21 @@ function DashboardPage() {
   const [isScraping, setIsScraping] = useState(false);
 
   const [activeTab, setActiveTab] = useState(0);
-  const [viewMode, setViewMode] = useState('calendar');
+  const [viewMode, setViewMode] = useState('calendar'); // calendar | list | analytics
   const [searchQuery, setSearchQuery] = useState('');
   const [initialDate, setInitialDate] = useState(null);
   const [statusFilter, setStatusFilter] = useState(new Set());
 
-  /* Pagination */
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-
-  const navigate = useNavigate();
 
   /* ---------- Fetch Applications ---------- */
 
   const fetchApplications = useCallback(async () => {
     try {
-      const response = await api.get('/applications');
-      setApplications(response.data);
+      const res = await api.get('/applications');
+      setApplications(res.data);
     } catch (err) {
-      console.error(err);
       setError('Failed to load applications.');
       if (err.response?.status === 401) navigate('/login');
     } finally {
@@ -123,7 +123,7 @@ function DashboardPage() {
     fetchApplications();
   }, [fetchApplications]);
 
-  /* ---------- Modal Handlers ---------- */
+  /* ---------- CRUD ---------- */
 
   const handleOpenCreateModal = () => {
     setInitialDate(null);
@@ -143,266 +143,191 @@ function DashboardPage() {
     setInitialDate(null);
   };
 
-  const handleSaveApplication = async (formData) => {
-    const isEditing = editingApplication?.id;
+  const handleSaveApplication = async (data) => {
+    const req = editingApplication?.id
+      ? api.put(`/applications/${editingApplication.id}`, data)
+      : api.post('/applications', data);
 
-    const savePromise = isEditing
-      ? api.put(`/applications/${editingApplication.id}`, formData)
-      : api.post('/applications', formData);
-
-    toast.promise(savePromise, {
+    toast.promise(req, {
       loading: 'Saving...',
-      success: <b>Saved!</b>,
-      error: <b>Could not save.</b>,
+      success: 'Saved!',
+      error: 'Could not save.'
     });
 
-    try {
-      await savePromise;
-      fetchApplications();
-      handleCloseModal();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleOpenDeleteModal = (appId) => {
-    setApplicationToDelete(appId);
-    setIsDeleteModalOpen(true);
+    await req;
+    fetchApplications();
+    handleCloseModal();
   };
 
   const handleConfirmDelete = async () => {
-    if (!applicationToDelete) return;
-
-    const deletePromise = api.delete(`/applications/${applicationToDelete}`);
-
-    toast.promise(deletePromise, {
+    const req = api.delete(`/applications/${applicationToDelete}`);
+    toast.promise(req, {
       loading: 'Deleting...',
-      success: <b>Deleted.</b>,
-      error: <b>Could not delete.</b>,
+      success: 'Deleted!',
+      error: 'Failed.'
     });
-
-    try {
-      await deletePromise;
-      fetchApplications();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsDeleteModalOpen(false);
-      setApplicationToDelete(null);
-    }
+    await req;
+    fetchApplications();
+    setIsDeleteModalOpen(false);
   };
 
-  /* ---------- Filters ---------- */
+  /* ---------- Scraper ---------- */
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddToTracker = (job) => {
-    const newAppData = {
-      company: job.company,
-      roleTitle: job.roleTitle,
-      jobUrl: job.jobUrl,
-      status: 'Discovered'
-    };
-    setEditingApplication(newAppData);
-    setIsModalOpen(true);
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
-
-  const handleViewChange = (event, newViewMode) => {
-    if (newViewMode) setViewMode(newViewMode);
-  };
-
-  const handleDateClick = (dateStr) => {
-    setInitialDate(dateStr);
-    setEditingApplication(null);
-    setIsModalOpen(true);
-  };
-
-  const onFilterChange = (newFilter) => setStatusFilter(newFilter);
-
-  /* ---------- Scraper + Pagination ---------- */
-
-  const handleScrape = useCallback(async (page = 1) => {
+  const handleScrape = async (page = 1) => {
     setIsScraping(true);
-    setError('');
+    const res = await api.post('/scrape/jobs', { filters, page });
+    setScrapedJobs(res.data.jobs);
+    setTotalPages(res.data.totalPages);
     setCurrentPage(page);
-
-    try {
-      const response = await api.post('/scrape/jobs', { filters, page });
-
-      setScrapedJobs(response.data.jobs);
-      setTotalPages(response.data.totalPages);
-
-      if (response.data.jobs.length > 0 && page === 1) {
-        toast.success(`Found ~${response.data.totalPages * 10} jobs!`);
-      }
-    } catch {
-      toast.error('Failed to find jobs.');
-    } finally {
-      setIsScraping(false);
-    }
-  }, [filters]);
-
-  const handlePageChange = (event, value) => {
-    handleScrape(value);
+    setIsScraping(false);
   };
 
-  /* ---------- Filtered Applications ---------- */
+  /* ---------- Filtering ---------- */
 
   const filteredApplications = useMemo(() => {
-    let filtered = applications;
+    let data = applications;
 
     if (searchQuery) {
-      filtered = filtered.filter(app =>
+      data = data.filter(app =>
         app.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         app.roleTitle.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     if (statusFilter.size > 0) {
-      filtered = filtered.filter(app =>
-        statusFilter.has(app.status)
-      );
+      data = data.filter(app => statusFilter.has(app.status));
     }
 
-    return filtered;
+    return data;
   }, [applications, searchQuery, statusFilter]);
-
-  /* ---------- Loading ---------- */
 
   if (loading) {
     return (
       <Box>
         <Navbar />
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Box sx={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <CircularProgress />
         </Box>
       </Box>
     );
   }
 
-  /* ---------- UI ---------- */
-
   return (
     <Box>
       <Navbar />
 
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4, px: 4 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label="My Tracked Applications" />
-            <Tab label="Discover New Jobs" />
-          </Tabs>
-        </Box>
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
+        <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 3 }}>
+          <Tab label="My Tracked Applications" />
+          <Tab label="Discover New Jobs" />
+        </Tabs>
 
-        {/* ---------- Applications Tab ---------- */}
         {activeTab === 0 && (
-          <Box>
+          <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
               <Typography variant="h4">My Tracked Applications</Typography>
 
               <Box sx={{ display: 'flex', gap: 2 }}>
-                <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange}>
-                  <ToggleButton value="calendar">
-                    <CalendarViewMonthIcon />
-                  </ToggleButton>
-                  <ToggleButton value="list">
-                    <ViewListIcon />
-                  </ToggleButton>
+                <ToggleButtonGroup value={viewMode} exclusive onChange={(e, v) => v && setViewMode(v)}>
+                  <ToggleButton value="calendar"><CalendarViewMonthIcon /></ToggleButton>
+                  <ToggleButton value="list"><ViewListIcon /></ToggleButton>
+                  <ToggleButton value="analytics"><BarChartIcon /></ToggleButton>
                 </ToggleButtonGroup>
 
-                <Button variant="contained" color="secondary" onClick={handleOpenCreateModal}>
+                <Button variant="contained" onClick={handleOpenCreateModal}>
                   Add Manually
                 </Button>
               </Box>
             </Box>
 
-            <Paper sx={{ p: 2, mb: 3 }}>
-              <TextField
-                fullWidth
-                label="Search by Company or Role..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </Paper>
+            {viewMode !== 'analytics' && (
+              <>
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    label="Search by company or role"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </Paper>
 
-            <StatusLegend filter={statusFilter} onFilterChange={onFilterChange} />
+                <StatusLegend filter={statusFilter} onFilterChange={setStatusFilter} />
+              </>
+            )}
 
             <Paper sx={{ p: 2 }}>
-              {viewMode === 'calendar' ? (
+              {viewMode === 'calendar' && (
                 <ApplicationsCalendar
                   applications={filteredApplications}
                   onEventClick={handleOpenEditModal}
-                  onDateClick={handleDateClick}
-                />
-              ) : (
-                <ApplicationsDataGrid
-                  applications={filteredApplications}
-                  onEdit={handleOpenEditModal}
-                  onDelete={handleOpenDeleteModal}
+                  onDateClick={(d) => {
+                    setInitialDate(d);
+                    setIsModalOpen(true);
+                  }}
                 />
               )}
+
+              {viewMode === 'list' && (
+                filteredApplications.length ? (
+                  <ApplicationsDataGrid
+                    applications={filteredApplications}
+                    onEdit={handleOpenEditModal}
+                    onDelete={(id) => {
+                      setApplicationToDelete(id);
+                      setIsDeleteModalOpen(true);
+                    }}
+                  />
+                ) : (
+                  <Typography align="center" sx={{ py: 5 }}>
+                    No applications match your filters.
+                  </Typography>
+                )
+              )}
+
+              {viewMode === 'analytics' && (
+                <Box sx={{ width: '100%' }}>
+                  <AnalyticsDashboard applications={applications} />
+                </Box>
+              )}
             </Paper>
-          </Box>
+          </>
         )}
 
-        {/* ---------- Scraper Tab ---------- */}
         {activeTab === 1 && (
-          <Box>
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Typography variant="h5" gutterBottom>
-                Find New Jobs
-              </Typography>
-
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Category" name="category" value={filters.category} onChange={handleFilterChange} fullWidth />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Keywords" name="keywords" value={filters.keywords} onChange={handleFilterChange} fullWidth />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Country" name="country" value={filters.country} onChange={handleFilterChange} fullWidth />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Skills" name="skills" value={filters.skills} onChange={handleFilterChange} fullWidth />
-                </Grid>
+          <>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Grid container spacing={2}>
+                {Object.keys(filters).map(key => (
+                  <Grid item xs={12} sm={6} key={key}>
+                    <TextField
+                      fullWidth
+                      label={key}
+                      name={key}
+                      value={filters[key]}
+                      onChange={(e) =>
+                        setFilters(prev => ({ ...prev, [key]: e.target.value }))
+                      }
+                    />
+                  </Grid>
+                ))}
               </Grid>
 
-              <Button variant="contained" onClick={() => handleScrape(1)} disabled={isScraping}>
+              <Button sx={{ mt: 2 }} variant="contained" onClick={() => handleScrape(1)}>
                 {isScraping ? 'Searching...' : 'Find Jobs'}
               </Button>
             </Paper>
 
-            {error && <Alert severity="error">{error}</Alert>}
+            {scrapedJobs.map((job, i) => (
+              <ScrapedJobCard key={i} job={job} />
+            ))}
 
-            {scrapedJobs.length > 0 && (
-              <Box>
-                <Typography variant="h4" gutterBottom>
-                  Discovered Jobs
-                </Typography>
-
-                {scrapedJobs.map((job, index) => (
-                  <ScrapedJobCard key={index} job={job} onAddToTracker={handleAddToTracker} />
-                ))}
-
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                  <Pagination
-                    count={totalPages}
-                    page={currentPage}
-                    onChange={handlePageChange}
-                    color="primary"
-                  />
-                </Box>
-              </Box>
-            )}
-          </Box>
+            <Pagination
+              sx={{ mt: 3 }}
+              count={totalPages}
+              page={currentPage}
+              onChange={(e, v) => handleScrape(v)}
+            />
+          </>
         )}
       </Container>
 

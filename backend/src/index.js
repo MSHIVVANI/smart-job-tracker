@@ -11,8 +11,10 @@ import profileRoutes from './routes/profileRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
 import { scanAllUserInboxes } from './services/emailScanner.js';
+import { sendInterviewReminders } from './services/smsService.js';
 
 const app = express();
+// We use httpServer because Socket.io requires it
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
@@ -38,15 +40,23 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/email', emailRoutes);
 
+// --- ONLY LISTEN ONCE HERE ---
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   
-  // Schedule the job to run at the start of every second hour
+  // 1. Email Scanner Schedule (Every 2 hours)
   console.log('🗓️ Scheduling email scan job to run every two hours...');
   cron.schedule('0 */2 * * *', () => {
     scanAllUserInboxes();
   });
 
+  // 2. SMS Schedule (Every day at 9:00 AM)
+  console.log('🗓️ Scheduling daily SMS interview reminder job...');
+  cron.schedule('0 9 * * *', () => {
+    sendInterviewReminders();
+  });
+  console.log('🚀 Forcing SMS check on startup...');
+  sendInterviewReminders(); 
   // Uncomment for immediate testing
   // console.log('🚀 Running initial email scan on startup for testing...');
   // scanAllUserInboxes();

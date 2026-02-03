@@ -12,6 +12,7 @@ model User {
   email              String              @unique
   password           String
   profile            String?             @db.Text
+  phoneNumber        String?
   applications       Application[]
   serviceCredentials ServiceCredential[]
 }
