@@ -31,7 +31,7 @@ export const login = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found." });
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) return res.status(400).json({ message: 'Invalid credentials.' });
-    const token = jwt.sign({ email: user.email, id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ email: user.email, id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(200).json({ token });
   } catch (error) {
     console.error('Login Error:', error);
@@ -63,7 +63,8 @@ export const googleAuth = (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline', // 'offline' is required to get a refresh_token
     scope: scopes,
-    state: req.userId, // Pass our internal user ID so we know who to link the token to on callback
+    state: req.userId,
+    prompt: 'consent', // Pass our internal user ID so we know who to link the token to on callback
   });
 
   res.redirect(url); // Redirect the user's browser to the Google consent screen
@@ -94,7 +95,8 @@ export const googleAuthCallback = async (req, res) => {
         data: {
           accessToken: access_token,
           refreshToken: refresh_token || existingCredential.refreshToken,
-          expiryDate: expiry_date,
+          expiryDate: expiry_date ? String(expiry_date) : null,
+          status: 'active'
         },
       });
     } else {
@@ -105,7 +107,8 @@ export const googleAuthCallback = async (req, res) => {
           service: 'gmail',
           accessToken: access_token,
           refreshToken: refresh_token,
-          expiryDate: expiry_date,
+          expiryDate: expiry_date ? String(expiry_date) : null,
+          status: 'active'
         },
       });
     }

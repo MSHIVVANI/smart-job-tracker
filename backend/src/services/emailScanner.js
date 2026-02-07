@@ -14,26 +14,62 @@ export const scanAllUserInboxes = async () => {
     include: { user: { include: { applications: true } } },
   });
 
-  if (credentials.length === 0) { console.log('--- [SCANNER]: No active users to scan. Job finished. ---'); return; }
+  if (credentials.length === 0) { 
+    console.log('--- [SCANNER]: No active users to scan. Job finished. ---'); 
+    return; 
+  }
   
   for (const cred of credentials) {
-    if (cred.user.applications.length === 0) { console.log(`--- [SCANNER]: User ${cred.user.email} has no applications. Skipping. ---`); continue; }
+    if (cred.user.applications.length === 0) { 
+      console.log(`--- [SCANNER]: User ${cred.user.email} has no applications. Skipping. ---`); 
+      continue; 
+    }
     
     try {
-      const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-      oauth2Client.setCredentials({ access_token: cred.accessToken, refresh_token: cred.refreshToken, expiry_date: Number(cred.expiryDate) });
-      oauth2Client.on('tokens', async (tokens) => { await prisma.serviceCredential.update({ where: { id: cred.id }, data: { accessToken: tokens.access_token, expiryDate: tokens.expiry_date, refreshToken: tokens.refresh_token || cred.refreshToken } }); });
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID, 
+        process.env.GOOGLE_CLIENT_SECRET
+      );
+
+      // Convert back to Number for Google Client logic
+      oauth2Client.setCredentials({ 
+        access_token: cred.accessToken, 
+        refresh_token: cred.refreshToken, 
+        expiry_date: Number(cred.expiryDate) 
+      });
+
+      // FIXED: Added String() conversion here to prevent Prisma validation crash
+      oauth2Client.on('tokens', async (tokens) => { 
+        console.log('--- [SCANNER]: Received new tokens from Google. Updating DB... ---');
+        await prisma.serviceCredential.update({ 
+          where: { id: cred.id }, 
+          data: { 
+            accessToken: tokens.access_token, 
+            expiryDate: tokens.expiry_date ? String(tokens.expiry_date) : null, // FIX: Convert Int to String
+            refreshToken: tokens.refresh_token || cred.refreshToken 
+          } 
+        }); 
+      });
 
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       const res = await gmail.users.messages.list({ userId: 'me', q: 'is:unread' });
       const messages = res.data.messages;
 
-      if (!messages || messages.length === 0) { console.log(`--- [SCANNER]: No unread emails for ${cred.user.email}.`); continue; }
+      if (!messages || messages.length === 0) { 
+        console.log(`--- [SCANNER]: No unread emails for ${cred.user.email}.`); 
+        continue; 
+      }
 
       console.log(`--- [SCANNER]: Found ${messages.length} unread email(s) for ${cred.user.email}. Starting AI relevance check...`);
       
       for (const message of messages) {
-        const emailMetadata = await gmail.users.messages.get({ userId: 'me', id: message.id, format: 'metadata', metadataHeaders: ['Subject'] });
+        const emailMetadata = await gmail.users.messages.get({ 
+          userId: 'me', 
+          id: message.id, 
+          format: 'metadata', 
+          metadataHeaders: ['Subject'] 
+        });
+        
         const subject = emailMetadata.data.payload.headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
         const snippet = emailMetadata.data.snippet || '';
 
@@ -79,6 +115,7 @@ export const scanAllUserInboxes = async () => {
             global.io.emit('application-updated', { userId: cred.userId, updatedApp });
           }
 
+          // Mark as read so we don't process it again next time
           await gmail.users.messages.modify({ userId: 'me', id: message.id, requestBody: { removeLabelIds: ['UNREAD'] } });
         }
       }

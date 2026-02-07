@@ -1,69 +1,65 @@
-// frontend/src/App.jsx
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage'; 
-import { createTheme, ThemeProvider } from '@mui/material/styles';
 import SettingsPage from './pages/SettingsPage';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 const theme = createTheme({
-  typography: {
-    fontFamily: [
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-      '"Apple Color Emoji"',
-      '"Segoe UI Emoji"',
-      '"Segoe UI Symbol"',
-    ].join(','),
-
-    // 2. Refine heading sizes and weights for a cleaner look
-    h4: { // Main dashboard titles
-      fontSize: '1.7rem',
-      fontWeight: 500, // Reduced from bold to semi-bold
+  palette: {
+    primary: {
+      main: '#2D334A', // Navy
     },
-    h5: { // Card titles and modal titles
-      fontSize: '1.25rem',
-      fontWeight: 500, // Reduced from bold
+    secondary: {
+      main: '#A9B7C0', // Slate
     },
-    h6: { // Secondary titles (e.g., Kanban column titles)
-      fontSize: '1.05rem',
-      fontWeight: 500, // Reduced from bold
+    background: {
+      default: '#F2F1E1', // Cream
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#2D334A',
+      secondary: '#64748b',
     },
   },
-
-  // 3. Customize specific component styles to remove unnecessary boldness
-  components: {
-    // Customize Tab styles
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none', // Prevent ALL CAPS
-          fontWeight: 500,       // Set a consistent weight
-          fontSize: '1rem',
-        },
-      },
+  shape: {
+    borderRadius: 12, // Softer corners globally
+  },
+  typography: {
+    fontFamily: "'Inter', sans-serif",
+    h4: {
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      fontWeight: 800,
+      letterSpacing: '-0.02em',
     },
-    // Customize Button styles
+    h6: {
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      fontWeight: 700,
+    },
+    button: {
+      textTransform: 'none',
+      fontWeight: 600,
+    },
+  },
+  components: {
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none', // Prevent ALL CAPS on buttons
+          padding: '8px 20px',
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(45, 51, 74, 0.1)',
+          },
         },
       },
     },
-    // Customize Dialog titles for modals
-    MuiDialogTitle: {
+    MuiPaper: {
       styleOverrides: {
         root: {
-          fontWeight: 500, // Make modal titles semi-bold
+          boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+          border: '1px solid #E1D8C1',
         },
       },
     },
@@ -73,17 +69,26 @@ const theme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={theme}>
-    <BrowserRouter>
-      <Toaster position="top-center" reverseOrder={false} />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profile" element={<ProfilePage />} /> 
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/" element={<Navigate to="/login" />} />
-      </Routes>
-    </BrowserRouter>
+      <BrowserRouter>
+        <Toaster 
+          position="top-center" 
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+              background: '#2D334A',
+              color: '#fff',
+            },
+          }} 
+        />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} /> 
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/" element={<Navigate to="/login" />} />
+        </Routes>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }
