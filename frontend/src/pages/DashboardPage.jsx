@@ -185,9 +185,9 @@ function DashboardPage() {
              <Paper sx={{ p: 6, borderRadius: 10, border: '1px solid #E1D8C1', textAlign: 'center', mb: 6, background: 'white' }}>
                 <Box sx={{ display: 'inline-flex', p: 2, borderRadius: '50%', bgcolor: '#f1f5f9', mb: 2 }}><TravelExploreIcon sx={{ fontSize: 50, color: '#2D334A' }} /></Box>
                 <Typography variant="h3" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Explore Opportunities</Typography>
-                <Typography variant="body1" sx={{ color: '#A9B7C0', mb: 4, fontWeight: 500 }}>AI is scanning the web for roles that match your profile.</Typography>
+                <Typography variant="body1" sx={{ color: '#A9B7C0', mb: 4, fontWeight: 500 }}>Aggregating millions of roles from LinkedIn, Indeed, and 100+ sources</Typography>
                 <Box sx={{ display: 'flex', gap: 1, maxWidth: '700px', mx: 'auto', mb: 3 }}>
-                  <TextField fullWidth placeholder="Search keywords..." value={filters.keywords} onChange={(e) => setFilters({keywords: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && handleScrape(1)} InputProps={{ sx: { borderRadius: '50px', bgcolor: '#f8fafc', px: 2 } }} />
+                  <TextField fullWidth placeholder="Search by technology, role title, or specific company..." value={filters.keywords} onChange={(e) => setFilters({keywords: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && handleScrape(1)} InputProps={{ sx: { borderRadius: '50px', bgcolor: '#f8fafc', px: 2 } }} />
                   <Button variant="contained" sx={{ bgcolor: '#2D334A', px: 5, borderRadius: '50px', fontWeight: 800 }} onClick={() => handleScrape(1)} disabled={isScraping}>Find</Button>
                 </Box>
                 <Stack direction="row" spacing={1} justifyContent="center" sx={{ flexWrap: 'wrap', gap: 1 }}>

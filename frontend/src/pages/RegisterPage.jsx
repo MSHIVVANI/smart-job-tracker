@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
-import toast from 'react-hot-toast'; // Import toast
-import { TextField, Button, Container, Typography, Box, Alert, Paper } from '@mui/material';
+import toast from 'react-hot-toast';
+import { TextField, Button, Container, Typography, Box, Alert, Paper, Stack } from '@mui/material';
+import Logo from '../components/Logo';
 
 function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -13,73 +14,69 @@ function RegisterPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
+    if (password.length < 6) return setError('Password must be at least 6 characters.');
+    
     try {
       await api.post('/auth/register', { email, password });
-      toast.success('Registration successful! Please sign in.');
+      toast.success('Account created! Please sign in.');
       navigate('/login');
     } catch (err) {
-      console.error('Registration failed:', err);
-      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
-      setError(errorMessage);
+      setError(err.response?.data?.message || 'Registration failed.');
     }
   };
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Paper elevation={3} sx={{ mt: 8, p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        
-        {/* --- Logo --- */}
-        <Box
-          component="img"
-          src="/logo.svg"
-          alt="Smart Job Tracker Logo"
-          sx={{ height: 40, mb: 2 }}
-        />
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: '#F2F1E1' }}>
+      <Container maxWidth="sm">
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 5, 
+            borderRadius: 6, 
+            border: '1px solid #E1D8C1', 
+            textAlign: 'center',
+            boxShadow: '0 10px 40px rgba(45,51,74,0.05)'
+          }}
+        >
+          <Stack alignItems="center" spacing={2} sx={{ mb: 4 }}>
+            <Logo size={64} color="#2D334A" />
+            <Typography variant="h4" sx={{ fontWeight: 900, color: '#2D334A', letterSpacing: '-1.5px' }}>
+              Create Account
+            </Typography>
+            <Typography sx={{ color: '#A9B7C0', fontWeight: 500 }}>
+              Secure your next role faster. Connect your Gmail, upload your resume, and let AI manage your application lifecycle
+            </Typography>
+          </Stack>
 
-        {/* --- App Title --- */}
-        <Typography component="h1" variant="h4" gutterBottom>
-          Smart Job Tracker
-        </Typography>
+          {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
 
-        {/* --- App Description --- */}
-        <Typography color="text.secondary" textAlign="center" sx={{ mb: 3 }}>
-          Your intelligent copilot for discovering opportunities, tracking applications, and optimizing your resume.
-        </Typography>
-        
-        <Typography component="h2" variant="h5">
-          Create an Account
-        </Typography>
-
-        {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
-        
-        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%', maxWidth: '400px' }}>
-          <TextField
-            margin="normal" required fullWidth
-            id="email" label="Email Address" name="email"
-            autoComplete="email" autoFocus
-            value={email} onChange={(e) => setEmail(e.target.value)}
-          />
-          <TextField
-            margin="normal" required fullWidth
-            name="password" label="Password" type="password" id="password"
-            autoComplete="new-password"
-            value={password} onChange={(e) => setPassword(e.target.value)}
-          />
-          <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
-            Sign Up
-          </Button>
-          <Box textAlign="center">
-            <Link to="/login" variant="body2" style={{ textDecoration: 'none' }}>
-              {'Already have an account? Sign In'}
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <TextField
+              margin="normal" required fullWidth label="Email Address"
+              value={email} onChange={(e) => setEmail(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcf9' } }}
+            />
+            <TextField
+              margin="normal" required fullWidth label="Password" type="password"
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#fcfcf9' } }}
+            />
+            <Button 
+              type="submit" fullWidth variant="contained" 
+              sx={{ 
+                mt: 4, mb: 3, py: 1.5, borderRadius: 3, bgcolor: '#2D334A', 
+                fontWeight: 800, fontSize: '1rem', textTransform: 'none'
+              }}
+            >
+              Sign Up
+            </Button>
+            <Link to="/login" style={{ textDecoration: 'none', color: '#A9B7C0', fontWeight: 600 }}>
+              Already have an account? <span style={{ color: '#2D334A' }}>Sign In</span>
             </Link>
           </Box>
-        </Box>
-      </Paper>
-    </Container>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
 

@@ -1,18 +1,25 @@
-// backend/src/routes/profileRoutes.js
-
 import express from 'express';
+import multer from 'multer';
 import authMiddleware from '../middleware/authMiddleware.js';
-import { getProfile, updateProfile } from '../controllers/profileController.js';
+import { getProfile, updateProfile, parseResume } from '../controllers/profileController.js';
 
 const router = express.Router();
 
-// Protect all routes in this file. Only logged-in users can access their profile.
+// Memory storage is best for small PDF files
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
 router.use(authMiddleware);
 
-// GET /api/profile
 router.get('/', getProfile);
-
-// PUT /api/profile
 router.put('/', updateProfile);
+
+// Route with pre-controller logging
+router.post('/upload', (req, res, next) => {
+  console.log('📬 [ROUTER]: Incoming request to /api/profile/upload');
+  next();
+}, upload.single('resume'), parseResume);
 
 export default router;

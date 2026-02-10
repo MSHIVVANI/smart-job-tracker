@@ -1,4 +1,4 @@
-import { Paper, Grid, Typography, Box, Card, Stack } from '@mui/material';
+import { Paper, Typography, Box, Card, Stack } from '@mui/material';
 import StatusDonutChart from './StatusDonutChart';
 import ActivityLineChart from './ActivityLineChart';
 import ConversionFunnelChart from './ConversionFunnelChart';
@@ -10,10 +10,10 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 
 function StatCard({ title, value, icon, color }) {
   return (
-    <Card sx={{ p: 3, height: '100%', borderRadius: 4, border: '1px solid #E1D8C1', boxShadow: 'none' }}>
+    <Card sx={{ p: 3, borderRadius: 4, border: '1px solid #E1D8C1', boxShadow: 'none', background: 'white' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Box>
-          <Typography variant="overline" sx={{ fontWeight: 800, color: 'text.secondary' }}>{title}</Typography>
+          <Typography variant="overline" sx={{ fontWeight: 800, color: 'text.secondary', letterSpacing: 1 }}>{title}</Typography>
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#2D334A' }}>{value}</Typography>
         </Box>
         <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}15`, color: color, display: 'flex' }}>{icon}</Box>
@@ -30,44 +30,45 @@ function AnalyticsDashboard({ applications }) {
 
   return (
     <Box sx={{ width: '100%', mt: 2 }}>
-      {/* Stat Row - 4 columns wide */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}><StatCard title="Total Pipeline" value={total} icon={<AssignmentIcon />} color="#3b82f6" /></Grid>
-        <Grid item xs={12} sm={6} md={3}><StatCard title="Interviews" value={interviewing} icon={<ScheduleIcon />} color="#ffc107" /></Grid>
-        <Grid item xs={12} sm={6} md={3}><StatCard title="Offers" value={offers} icon={<CheckCircleIcon />} color="#1b5e20" /></Grid>
-        <Grid item xs={12} sm={6} md={3}><StatCard title="Success Rate" value={`${rate}%`} icon={<TrendingUpIcon />} color="#9c27b0" /></Grid>
-      </Grid>
+      {/* 1. TOP STATS - Grid with 4 columns */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, 
+        gap: 3, 
+        mb: 4 
+      }}>
+        <StatCard title="Total Pipeline" value={total} icon={<AssignmentIcon />} color="#3b82f6" />
+        <StatCard title="Active Interviews" value={interviewing} icon={<ScheduleIcon />} color="#ffc107" />
+        <StatCard title="Offers Received" value={offers} icon={<CheckCircleIcon />} color="#004d40" />
+        <StatCard title="Success Rate" value={`${rate}%`} icon={<TrendingUpIcon />} color="#9c27b0" />
+      </Box>
 
-      {/* Charts Grid - Forces a 2x2 grid to prevent overlapping */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: 500, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Pipeline Distribution</Typography>
-            <Box sx={{ flexGrow: 1, minHeight: 0 }}><StatusDonutChart data={applications} /></Box>
-          </Paper>
-        </Grid>
+      {/* 2. CHARTS - Rigid 2-Column Grid (Solves thinness/overlapping) */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, 
+        gap: 3 
+      }}>
+        <Paper sx={{ p: 4, borderRadius: 4, height: 500, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Pipeline Distribution</Typography>
+          <Box sx={{ flexGrow: 1, minHeight: 0 }}><StatusDonutChart data={applications} /></Box>
+        </Paper>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: 500, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Search Funnel</Typography>
-            <Box sx={{ flexGrow: 1, minHeight: 0 }}><ConversionFunnelChart data={applications} /></Box>
-          </Paper>
-        </Grid>
+        <Paper sx={{ p: 4, borderRadius: 4, height: 500, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Search Funnel</Typography>
+          <Box sx={{ flexGrow: 1, minHeight: 0 }}><ConversionFunnelChart data={applications} /></Box>
+        </Paper>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: 480, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Activity Velocity</Typography>
-            <Box sx={{ flexGrow: 1, minHeight: 0 }}><ActivityLineChart data={applications} /></Box>
-          </Paper>
-        </Grid>
+        <Paper sx={{ p: 4, borderRadius: 4, height: 450, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Activity Velocity</Typography>
+          <Box sx={{ flexGrow: 1, minHeight: 0 }}><ActivityLineChart data={applications} /></Box>
+        </Paper>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: 480, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Outcome Trends</Typography>
-            <Box sx={{ flexGrow: 1, minHeight: 0 }}><StatusTrendsChart data={applications} /></Box>
-          </Paper>
-        </Grid>
-      </Grid>
+        <Paper sx={{ p: 4, borderRadius: 4, height: 450, display: 'flex', flexDirection: 'column', border: '1px solid #E1D8C1', overflow: 'hidden' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: '#2D334A' }}>Outcome Trends</Typography>
+          <Box sx={{ flexGrow: 1, minHeight: 0 }}><StatusTrendsChart data={applications} /></Box>
+        </Paper>
+      </Box>
     </Box>
   );
 }
